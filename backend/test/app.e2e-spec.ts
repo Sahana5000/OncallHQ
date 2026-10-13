@@ -5,6 +5,7 @@ import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { INCIDENT_ESCALATION_QUEUE } from '../src/modules/incidents/escalation.service';
+import { EscalationProcessor } from '../src/modules/incidents/escalation.processor';
 
 describe('OnCallHQ System E2E Integration Suite', () => {
   let app: INestApplication;
@@ -21,6 +22,8 @@ describe('OnCallHQ System E2E Integration Suite', () => {
     })
       .overrideProvider(getQueueToken(INCIDENT_ESCALATION_QUEUE))
       .useValue(mockQueue)
+      .overrideProvider(EscalationProcessor)
+      .useValue({ process: jest.fn() })
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -75,7 +78,7 @@ describe('OnCallHQ System E2E Integration Suite', () => {
   it('Full Incident Lifecycle E2E Flow (Ingest -> Dedup -> Ack -> Resolve -> Audit)', async () => {
     const serviceKey = 'test_service_key_123';
     const targetResource = `e2e-node-${Date.now()}`;
-    const userId = '11111111-1111-1111-1111-111111111111';
+    const userId = '5c5a8e56-802b-4087-aeb4-047da9274943';
 
     // 1. Ingest Alert & Trigger Incident
     const ingestRes = await request(app.getHttpServer())

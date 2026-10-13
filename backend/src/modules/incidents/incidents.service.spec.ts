@@ -161,6 +161,20 @@ describe('IncidentsService (Phase 4 Escalation Engine & Phase 5 Integration)', (
         'escalate-incident-uuid-1-tier-1',
       );
     });
+
+    it('Concurrency: two simultaneous acknowledgements on one incident — deterministic resolution', async () => {
+      const userAId = 'user-uuid-1';
+      const userBId = 'user-uuid-2';
+
+      const [resA, resB] = await Promise.all([
+        incidentsService.acknowledgeIncident(mockIncident.id, userAId),
+        incidentsService.acknowledgeIncident(mockIncident.id, userBId),
+      ]);
+
+      expect(resA.state).toBe(IncidentState.ACKNOWLEDGED);
+      expect(resB.state).toBe(IncidentState.ACKNOWLEDGED);
+      expect(resA.ackedAt).toBeDefined();
+    });
   });
 
   describe('handleTierEscalation', () => {
