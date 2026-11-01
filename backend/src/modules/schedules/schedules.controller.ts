@@ -6,13 +6,17 @@ import {
   Param,
   Query,
   NotFoundException,
+  UseGuards,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Schedule } from '../../entities/schedule.entity';
 import { Override } from '../../entities/override.entity';
-import { User } from '../../entities/user.entity';
+import { User, UserRole } from '../../entities/user.entity';
 import { ScheduleResolverService } from './schedule-resolver.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 class CreateOverrideDto {
   userId: string;
@@ -21,6 +25,7 @@ class CreateOverrideDto {
 }
 
 @Controller('schedules')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class SchedulesController {
   constructor(
     @InjectRepository(Schedule)
@@ -76,7 +81,19 @@ export class SchedulesController {
     );
   }
 
+  @Get(':serviceId/current')
+  async getCurrentOnCallUser(
+    @Param('serviceId') serviceId: string,
+    @Query('timestamp') timestamp?: string,
+  ) {
+    return this.scheduleResolverService.resolveOnCallUser(
+      serviceId,
+      timestamp,
+    );
+  }
+
   @Post(':scheduleId/overrides')
+  @Roles(UserRole.ADMIN, UserRole.LEAD)
   async createOverride(
     @Param('scheduleId') scheduleId: string,
     @Body() dto: CreateOverrideDto,

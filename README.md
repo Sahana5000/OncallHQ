@@ -1,6 +1,6 @@
 # OnCallHQ — Incident Response & On-Call Platform
 
-[![CI Pipeline](https://github.com/Sahana9000/OncallHQ/actions/workflows/ci.yml/badge.svg)](https://github.com/Sahana9000/OncallHQ/actions)
+[![CI Pipeline](https://github.com/Sahana5000/OncallHQ/actions/workflows/ci.yml/badge.svg)](https://github.com/Sahana5000/OncallHQ/actions)
 [![NestJS](https://img.shields.io/badge/backend-NestJS%2010-ea2845.svg)](https://nestjs.com/)
 [![Next.js](https://img.shields.io/badge/frontend-Next.js%2014-black.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/database-PostgreSQL%2016-336791.svg)](https://www.postgresql.org/)
@@ -80,6 +80,21 @@ When production services experience downtime at 3 a.m., alerts must reach the de
 - Live incident updates streamed via Socket.IO WebSockets.
 - Interactive on-call calendar with layer visualization and override creation modal.
 
+### 🔐 JWT Authentication & Server-Side RBAC
+- Stateless JWT access tokens with bcrypt password hashing (10 salt rounds).
+- Strict role-based authorization guards distinguishing `ADMIN`, `LEAD`, and `RESPONDER`.
+- Administrative privilege separation for override management, maintenance window scheduling, and user provisioning.
+
+### 🛠️ Maintenance Windows & Noise Suppression
+- Scheduled maintenance windows with timezone-aware start and end timestamps.
+- Automatically suppresses alerts from paging on-call responders during planned service downtime.
+- Retains full audit trail (`ALERT_SUPPRESSED_MAINTENANCE`) for accountability and postmortems.
+
+### 📈 MTTA & MTTR Incident Velocity Analytics
+- Accurate mathematical computation of Mean Time to Acknowledge (MTTA) and Mean Time to Resolve (MTTR).
+- Date-range filtering (7d, 14d, 30d) and per-service performance breakdown tables.
+- Daily incident volume, acknowledgment, and resolution trend visualizations.
+
 ---
 
 ## 4. Tech Stack
@@ -98,31 +113,44 @@ When production services experience downtime at 3 a.m., alerts must reach the de
 
 ## 5. Database Schema
 
-The core relational schema is managed in [`database/migrations/001_initial_schema.sql`](database/migrations/001_initial_schema.sql):
+The core relational schema is managed in [`database/migrations/001_initial_schema.sql`](database/migrations/001_initial_schema.sql) and [`database/migrations/002_auth_maintenance_schema.sql`](database/migrations/002_auth_maintenance_schema.sql):
 
-- `users`: Responder identity, contact info, and roles (`ADMIN`, `LEAD`, `RESPONDER`).
+- `users`: Responder identity, contact info, hashed password (`password_hash`), and roles (`ADMIN`, `LEAD`, `RESPONDER`).
 - `services`: Monitored microservices with secret ingestion API keys and fallback owners.
 - `schedules`: Service on-call calendars with timezone definitions.
 - `schedule_layers`: Base recurring shifts with `tstzrange` and GiST exclusion constraints.
 - `overrides`: Temporary shift overrides superseding base rotations.
+- `maintenance_windows`: Scheduled service downtime suppressing alerts from waking responders.
 - `incidents`: Incident lifecycle state, fingerprint, severity, alert count, and escalation job IDs.
 - `notifications`: Audit log of outbound alert dispatches (email, webhook, SMS mock).
-- `audit_log`: Immutable timeline logs of all state transitions and user actions.
+- `audit_log`: Immutable timeline logs of all state transitions, user actions, and alert suppressions.
 
 ---
 
 ## 6. API Reference
 
-| Method | Endpoint | Description | Auth |
+| Method | Endpoint | Description | Auth / Role |
 |---|---|---|---|
 | `POST` | `/ingest/:serviceKey` | Receive monitoring webhook alert | Service API Key |
 | `GET` | `/health` | System health and uptime status | Public |
-| `GET` | `/api/v1/incidents` | List all open and resolved incidents | JWT |
+| `POST` | `/api/v1/auth/register` | Register new user account | Public |
+| `POST` | `/api/v1/auth/login` | Authenticate user & issue JWT | Public |
+| `GET` | `/api/v1/auth/me` | Fetch active user profile | JWT |
+| `GET` | `/api/v1/incidents` | List all open and resolved incidents (filters & pagination) | JWT |
 | `GET` | `/api/v1/incidents/:id` | Get incident details and metadata | JWT |
-| `POST` | `/api/v1/incidents/:id/acknowledge` | Acknowledge incident & cancel escalation timer | JWT / User ID |
-| `POST` | `/api/v1/incidents/:id/resolve` | Resolve incident & finalize timeline | JWT / User ID |
-| `GET` | `/api/v1/schedules/:serviceId/on-call`| Resolve who is on call right now | JWT |
-| `POST` | `/api/v1/schedules/:scheduleId/overrides`| Create temporary on-call shift override | Admin / Lead |
+| `POST` | `/api/v1/incidents/:id/acknowledge` | Acknowledge incident & cancel escalation timer | JWT / Responder |
+| `POST` | `/api/v1/incidents/:id/ack` | Alias for acknowledging incident | JWT / Responder |
+| `POST` | `/api/v1/incidents/:id/resolve` | Resolve incident & finalize timeline | JWT / Responder |
+| `GET` | `/api/v1/schedules` | List all team schedules & layers | JWT |
+| `GET` | `/api/v1/schedules/:serviceId/on-call` | Resolve active responder for service right now | JWT |
+| `POST` | `/api/v1/schedules/:scheduleId/overrides` | Create temporary on-call shift override | Admin / Lead |
+| `GET` | `/api/v1/maintenance` | List active, upcoming, and past maintenance windows | JWT |
+| `POST` | `/api/v1/maintenance` | Schedule new maintenance window | Admin / Lead |
+| `PUT` | `/api/v1/maintenance/:id` | Update maintenance window schedule | Admin / Lead |
+| `DELETE` | `/api/v1/maintenance/:id` | Remove maintenance window | Admin / Lead |
+| `GET` | `/api/v1/analytics/overview` | Aggregate MTTA, MTTR, and severity breakdown | JWT |
+| `GET` | `/api/v1/analytics/services` | Service-by-service MTTA and MTTR performance | JWT |
+| `GET` | `/api/v1/analytics/trends` | Daily incident volume and resolution trends | JWT |
 | `GET` | `/api/v1/audit/:entityType/:entityId` | Retrieve complete audit trail for an incident | JWT |
 
 ---
@@ -136,7 +164,7 @@ The core relational schema is managed in [`database/migrations/001_initial_schem
 ### Option A: Run Full Stack via Docker Compose
 ```bash
 # Clone the repository
-git clone https://github.com/Sahana9000/OncallHQ.git
+git clone https://github.com/Sahana5000/OncallHQ.git
 cd OncallHQ
 
 # Spin up all services (PostgreSQL, Redis, NestJS Backend, Next.js Frontend)
@@ -175,17 +203,17 @@ docker-compose up --build -d
 
 ## 8. Verification & Testing
 
-The project maintains **68 automated tests** covering unit logic, fake-clock timers, concurrency, and end-to-end integration:
+The project maintains **94 automated tests** covering unit logic, authentication, RBAC, maintenance suppression, analytics calculations, fake-clock timers, concurrency, and end-to-end integration:
 
 ```bash
-# 1. Run Backend Unit & Fake-Clock Tests (51 tests)
+# 1. Run Backend Unit, Auth, Maintenance & Analytics Tests (73 tests across 14 suites)
 cd backend
 npm test
 
-# 2. Run Backend End-to-End Integration Suite (against live DB & Redis)
+# 2. Run Backend End-to-End Integration Suite (against live DB & Redis) (3 tests)
 npm run test:e2e
 
-# 3. Run Frontend UI & Component Tests (14 tests)
+# 3. Run Frontend UI, Page, Maintenance & Analytics Tests (18 tests across 6 suites)
 cd ../frontend
 npm test
 

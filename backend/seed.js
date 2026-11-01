@@ -2,18 +2,24 @@ const { Client } = require('pg');
 
 async function seed() {
   const client = new Client({
-    host: 'localhost',
-    port: 5432,
-    user: 'postgres',
-    password: '1234',
-    database: 'oncallhq',
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: Number(process.env.POSTGRES_PORT || 5432),
+    user: process.env.POSTGRES_USER || 'postgres',
+    password: process.env.POSTGRES_PASSWORD || 'postgres',
+    database: process.env.POSTGRES_DB || 'oncallhq',
   });
 
   await client.connect();
 
   await client.query(`
-    INSERT INTO users (id, email, name, role)
-    VALUES ('11111111-1111-1111-1111-111111111111', 'smoke@oncallhq.com', 'Smoke Test User', 'RESPONDER')
+    INSERT INTO users (id, email, name, role, password_hash)
+    VALUES (
+      '11111111-1111-1111-1111-111111111111',
+      'smoke@oncallhq.com',
+      'Smoke Test User',
+      'RESPONDER',
+      '$2a$10$7EqJtq98hPqEX7fNZaFWoO.82eG9oO9O7oFqEX7fNZaFWoO82eG9o'
+    )
     ON CONFLICT (email) DO NOTHING;
   `);
 

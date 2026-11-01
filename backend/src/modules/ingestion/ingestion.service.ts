@@ -3,6 +3,7 @@ import {
   Logger,
   UnauthorizedException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -11,17 +12,19 @@ import { Service } from '../../entities/service.entity';
 import { IncidentsService } from '../incidents/incidents.service';
 import { ScheduleResolverService } from '../schedules/schedule-resolver.service';
 import { AuditService } from '../audit/audit.service';
+import { MaintenanceService } from '../maintenance/maintenance.service';
 import { IngestAlertDto } from './dto/ingest-alert.dto';
 import { IncidentSeverity } from '../../entities/incident.entity';
 
 export interface IngestionResponse {
-  status: 'triggered' | 'deduplicated';
-  action: 'INCIDENT_TRIGGERED' | 'ALERT_DEDUPLICATED';
-  incidentId: string;
+  status: 'triggered' | 'deduplicated' | 'suppressed';
+  action: 'INCIDENT_TRIGGERED' | 'ALERT_DEDUPLICATED' | 'ALERT_SUPPRESSED_MAINTENANCE';
+  incidentId: string | null;
   fingerprint: string;
   alertCount: number;
   assignedUserId: string | null;
   resolvedSource?: string;
+  reason?: string;
 }
 
 @Injectable()
@@ -34,6 +37,8 @@ export class IngestionService {
     private readonly incidentsService: IncidentsService,
     private readonly scheduleResolverService: ScheduleResolverService,
     private readonly auditService: AuditService,
+    @Optional()
+    private readonly maintenanceService?: MaintenanceService,
   ) {}
 
   /**
@@ -80,7 +85,46 @@ export class IngestionService {
       targetResource,
     );
 
-    // 3. Deduplication Check against Open Incidents
+    // 3. Maintenance Window Noise Suppression Check
+    if (this.maintenanceService) {
+      const maintenanceCheck = await this.maintenanceService.isServiceInMaintenance(
+        service.id,
+      );
+      if (maintenanceCheck.inMaintenance) {
+        this.logger.log(
+          `Alert '${alertName}' on '${targetResource}' suppressed: service '${service.id}' is under active maintenance window '${maintenanceCheck.activeWindow?.name}'`,
+        );
+
+        await this.auditService.createLog({
+          orgId: service.orgId,
+          actorId: `service_key:${serviceKey}`,
+          action: 'ALERT_SUPPRESSED_MAINTENANCE',
+          entityType: 'SERVICE',
+          entityId: service.id,
+          metadata: {
+            alertName,
+            targetResource,
+            severity: dto.severity,
+            fingerprint,
+            maintenanceWindowId: maintenanceCheck.activeWindow?.id,
+            maintenanceWindowName: maintenanceCheck.activeWindow?.name,
+          },
+        });
+
+        return {
+          status: 'suppressed',
+          action: 'ALERT_SUPPRESSED_MAINTENANCE',
+          incidentId: null,
+          fingerprint,
+          alertCount: 0,
+          assignedUserId: null,
+          resolvedSource: 'MAINTENANCE_WINDOW',
+          reason: `Service is currently in maintenance window '${maintenanceCheck.activeWindow?.name}'`,
+        };
+      }
+    }
+
+    // 4. Deduplication Check against Open Incidents
     const existingOpenIncident = await this.incidentsService.findOpenIncidentByFingerprint(
       service.id,
       fingerprint,

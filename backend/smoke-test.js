@@ -68,6 +68,27 @@ async function runSmokeTest() {
     results.push({ step: '2. Frontend Server Check', status: 'FAIL', error: err.message });
   }
 
+  // Step 2b: JWT Authentication Check
+  let authToken = null;
+  let authUserId = USER_ID;
+  try {
+    const authRes = await request(`${BACKEND_URL}/api/v1/auth/register`, { method: 'POST' }, {
+      email: `smoke-${Date.now()}@oncallhq.com`,
+      password: 'SmokePassword123!',
+      name: 'Smoke Test User',
+      role: 'ADMIN',
+    });
+    authToken = authRes.data.accessToken;
+    if (authRes.data.user && authRes.data.user.id) {
+      authUserId = authRes.data.user.id;
+    }
+    console.log('[STEP 2b] JWT Authentication Check:', authToken ? 'PASS' : 'FAIL');
+    results.push({ step: '2b. JWT Authentication', status: authToken ? 'PASS' : 'FAIL' });
+  } catch (err) {
+    console.error('[STEP 2b] Auth Error:', err.message);
+    results.push({ step: '2b. JWT Authentication', status: 'FAIL', error: err.message });
+  }
+
   // Step 3: WebSocket Listener Setup
   const receivedWsEvents = [];
   const socket = io(BACKEND_URL, { transports: ['websocket', 'polling'] });
@@ -115,8 +136,12 @@ async function runSmokeTest() {
 
   // Step 5: Verify Incident in List & Details API
   try {
-    const listRes = await request(`${BACKEND_URL}/api/v1/incidents`);
-    const detailRes = await request(`${BACKEND_URL}/api/v1/incidents/${incidentId}`);
+    const listRes = await request(`${BACKEND_URL}/api/v1/incidents`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    const detailRes = await request(`${BACKEND_URL}/api/v1/incidents/${incidentId}`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
 
     const foundInList = Array.isArray(listRes.data) && listRes.data.some((i) => i.id === incidentId);
     const detailOk = detailRes.status === 200 && detailRes.data.id === incidentId;
@@ -135,7 +160,10 @@ async function runSmokeTest() {
 
   // Step 6: Acknowledge Incident API
   try {
-    const ackRes = await request(`${BACKEND_URL}/api/v1/incidents/${incidentId}/acknowledge`, { method: 'POST' }, { userId: USER_ID });
+    const ackRes = await request(`${BACKEND_URL}/api/v1/incidents/${incidentId}/acknowledge`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${authToken}` },
+    }, { userId: authUserId });
     console.log('[STEP 5] Incident Acknowledge API Response:', ackRes.status, 'state:', ackRes.data.state, 'ackedAt:', ackRes.data.ackedAt);
     const ackPass = ackRes.status === 200 && ackRes.data.state === 'ACKNOWLEDGED' && !!ackRes.data.ackedAt;
     results.push({
@@ -153,7 +181,10 @@ async function runSmokeTest() {
 
   // Step 7: Resolve Incident API
   try {
-    const resRes = await request(`${BACKEND_URL}/api/v1/incidents/${incidentId}/resolve`, { method: 'POST' }, { userId: USER_ID });
+    const resRes = await request(`${BACKEND_URL}/api/v1/incidents/${incidentId}/resolve`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${authToken}` },
+    }, { userId: authUserId });
     console.log('[STEP 6] Incident Resolve API Response:', resRes.status, 'state:', resRes.data.state, 'resolvedAt:', resRes.data.resolvedAt);
     const resPass = resRes.status === 200 && resRes.data.state === 'RESOLVED' && !!resRes.data.resolvedAt;
     results.push({
@@ -171,7 +202,9 @@ async function runSmokeTest() {
 
   // Step 8: Verify Audit Logs & Timeline
   try {
-    const auditRes = await request(`${BACKEND_URL}/api/v1/audit/INCIDENT/${incidentId}`);
+    const auditRes = await request(`${BACKEND_URL}/api/v1/audit/INCIDENT/${incidentId}`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
     const logs = Array.isArray(auditRes.data) ? auditRes.data : [];
     const actions = logs.map((l) => l.action);
     console.log('[STEP 7] Audit Timeline Events:', actions);

@@ -63,7 +63,12 @@ export class IncidentsService {
     return incident;
   }
 
-  async getIncidents(serviceId?: string, state?: IncidentState): Promise<Incident[]> {
+  async getIncidents(
+    serviceId?: string,
+    state?: IncidentState,
+    limit?: number,
+    offset?: number,
+  ): Promise<Incident[]> {
     const where: any = {};
     if (serviceId) where.serviceId = serviceId;
     if (state) where.state = state;
@@ -72,6 +77,8 @@ export class IncidentsService {
       where,
       relations: ['assignedUser', 'service'],
       order: { createdAt: 'DESC' },
+      take: limit ? Number(limit) : undefined,
+      skip: offset ? Number(offset) : undefined,
     });
   }
 

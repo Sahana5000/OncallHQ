@@ -10,6 +10,9 @@ import { IncidentsModule } from './modules/incidents/incidents.module';
 import { SchedulesModule } from './modules/schedules/schedules.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { MaintenanceModule } from './modules/maintenance/maintenance.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import {
   User,
   Service,
@@ -19,6 +22,7 @@ import {
   Incident,
   Notification,
   AuditLog,
+  MaintenanceWindow,
 } from './entities';
 
 @Module({
@@ -56,6 +60,7 @@ import {
           Incident,
           Notification,
           AuditLog,
+          MaintenanceWindow,
         ],
         synchronize: false,
       }),
@@ -70,11 +75,14 @@ import {
         },
       }),
     }),
+    AuthModule,
     IngestionModule,
     IncidentsModule,
     SchedulesModule,
     NotificationsModule,
     AuditModule,
+    MaintenanceModule,
+    AnalyticsModule,
   ],
   controllers: [HealthController],
   providers: [

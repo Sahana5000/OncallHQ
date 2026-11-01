@@ -1,16 +1,32 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { getCurrentUser, clearAuthSession } from '../lib/api';
+import { User } from '../types';
 
 const navLinks = [
-  { href: '/',            label: 'Dashboard',  icon: '⚡' },
-  { href: '/incidents',   label: 'Incidents',  icon: '🚨' },
-  { href: '/schedules',   label: 'Schedules',  icon: '📅' },
+  { href: '/',            label: 'Dashboard',   icon: '⚡' },
+  { href: '/incidents',   label: 'Incidents',   icon: '🚨' },
+  { href: '/schedules',   label: 'Schedules',   icon: '📅' },
+  { href: '/maintenance', label: 'Maintenance', icon: '🛠️' },
+  { href: '/analytics',   label: 'Analytics',   icon: '📊' },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    setUser(getCurrentUser());
+  }, [pathname]);
+
+  const handleLogout = () => {
+    clearAuthSession();
+    setUser(null);
+    router.push('/login');
+  };
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 w-56 flex flex-col bg-slate-950 border-r border-slate-800">
@@ -46,9 +62,37 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="px-5 py-4 border-t border-slate-800">
-        <p className="text-xs text-slate-600">v1.0.0 · Phase 6</p>
+      {/* User Section & Footer */}
+      <div className="px-4 py-4 border-t border-slate-800 space-y-3">
+        {user ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="truncate">
+                <p className="text-xs font-semibold text-slate-200 truncate">{user.name}</p>
+                <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-900/50 text-violet-300 border border-violet-700/50">
+                {user.role}
+              </span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="w-full text-left text-xs text-rose-400 hover:text-rose-300 transition-colors py-1 flex items-center gap-1.5"
+            >
+              <span>🚪</span> Sign Out
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Link
+              href="/login"
+              className="block w-full text-center py-1.5 px-3 rounded text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+            >
+              Sign In
+            </Link>
+          </div>
+        )}
+        <p className="text-[10px] text-slate-600 text-center">OnCallHQ Platform v1.2.0</p>
       </div>
     </aside>
   );

@@ -99,3 +99,56 @@ export interface Override {
   reason?: string;
   createdAt: string;
 }
+
+export interface MaintenanceWindow {
+  id: string;
+  serviceId: string;
+  service?: Service;
+  name: string;
+  description?: string;
+  startTime: string;
+  endTime: string;
+  createdBy?: string;
+  creator?: User;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DurationMetric {
+  seconds: number;
+  minutes: number;
+  hours: number;
+  sampleSize: number;
+}
+
+export interface AnalyticsOverview {
+  totalIncidents: number;
+  activeIncidents: number;
+  acknowledgedCount: number;
+  resolvedCount: number;
+  exhaustedCount: number;
+  mtta: DurationMetric;
+  mttr: DurationMetric;
+  severityBreakdown: Record<IncidentSeverity, number>;
+  stateBreakdown: Record<IncidentState, number>;
+}
+
+export interface ServiceMetric {
+  serviceId: string;
+  serviceName: string;
+  totalIncidents: number;
+  activeIncidents: number;
+  resolvedIncidents: number;
+  mtta: DurationMetric;
+  mttr: DurationMetric;
+}
+
+export interface DailyTrendPoint {
+  date: string;
+  triggeredCount: number;
+  acknowledgedCount: number;
+  resolvedCount: number;
+  avgMttaMinutes: number;
+  avgMttrMinutes: number;
+}
+

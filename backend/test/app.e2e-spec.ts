@@ -80,7 +80,21 @@ describe('OnCallHQ System E2E Integration Suite', () => {
     const targetResource = `e2e-node-${Date.now()}`;
     const userId = '5c5a8e56-802b-4087-aeb4-047da9274943';
 
-    // 1. Ingest Alert & Trigger Incident
+    // 0. Register E2E User to obtain JWT Auth Token
+    const regRes = await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({
+        email: `e2e-${Date.now()}@oncallhq.com`,
+        password: 'Password123!',
+        name: 'E2E Responder',
+        role: 'ADMIN',
+      })
+      .expect(201);
+
+    const authToken = regRes.body.accessToken;
+    expect(authToken).toBeDefined();
+
+    // 1. Ingest Alert & Trigger Incident (Public webhook endpoint with service key)
     const ingestRes = await request(app.getHttpServer())
       .post(`/ingest/${serviceKey}`)
       .send({
@@ -97,9 +111,10 @@ describe('OnCallHQ System E2E Integration Suite', () => {
     const incidentId = ingestRes.body.incidentId;
     expect(incidentId).toBeDefined();
 
-    // 2. Fetch Incident Details
+    // 2. Fetch Incident Details (Protected Endpoint requiring JWT)
     const detailRes = await request(app.getHttpServer())
       .get(`/api/v1/incidents/${incidentId}`)
+      .set('Authorization', `Bearer ${authToken}`)
       .expect(200);
 
     expect(detailRes.body.id).toBe(incidentId);
@@ -122,6 +137,7 @@ describe('OnCallHQ System E2E Integration Suite', () => {
     // 4. Acknowledge Incident
     const ackRes = await request(app.getHttpServer())
       .post(`/api/v1/incidents/${incidentId}/acknowledge`)
+      .set('Authorization', `Bearer ${authToken}`)
       .send({ userId })
       .expect(200);
 
@@ -131,6 +147,7 @@ describe('OnCallHQ System E2E Integration Suite', () => {
     // 5. Resolve Incident
     const resolveRes = await request(app.getHttpServer())
       .post(`/api/v1/incidents/${incidentId}/resolve`)
+      .set('Authorization', `Bearer ${authToken}`)
       .send({ userId })
       .expect(200);
 
@@ -140,6 +157,7 @@ describe('OnCallHQ System E2E Integration Suite', () => {
     // 6. Audit Trail Verification
     const auditRes = await request(app.getHttpServer())
       .get(`/api/v1/audit/INCIDENT/${incidentId}`)
+      .set('Authorization', `Bearer ${authToken}`)
       .expect(200);
 
     const actions = auditRes.body.map((l: any) => l.action);

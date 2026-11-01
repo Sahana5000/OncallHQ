@@ -6,3 +6,4 @@ export * from './override.entity';
 export * from './incident.entity';
 export * from './notification.entity';
 export * from './audit-log.entity';
+export * from './maintenance-window.entity';

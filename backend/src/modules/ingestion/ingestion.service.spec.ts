@@ -212,5 +212,43 @@ describe('IngestionService', () => {
         }),
       );
     });
+
+    it('should SUPPRESS alert and record audit log when service is under active maintenance window', async () => {
+      const mockMaintenanceService = {
+        isServiceInMaintenance: jest.fn().mockResolvedValue({
+          inMaintenance: true,
+          activeWindow: { id: 'win-99', name: 'Scheduled OS Upgrade' },
+        }),
+      };
+
+      const customIngestionService = new IngestionService(
+        serviceRepo,
+        incidentsService,
+        scheduleResolverService,
+        auditService,
+        mockMaintenanceService as any,
+      );
+
+      const dto = new IngestAlertDto();
+      dto.alertName = 'Disk Full';
+      dto.targetResource = 'db-disk-01';
+
+      const result = await customIngestionService.processIngestAlert(
+        mockService.ingestionKey,
+        dto,
+      );
+
+      expect(result.status).toBe('suppressed');
+      expect(result.action).toBe('ALERT_SUPPRESSED_MAINTENANCE');
+      expect(result.incidentId).toBeNull();
+      expect(incidentsService.createIncident).not.toHaveBeenCalled();
+      expect(auditService.createLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'ALERT_SUPPRESSED_MAINTENANCE',
+          entityType: 'SERVICE',
+          entityId: mockService.id,
+        }),
+      );
+    });
   });
 });

@@ -1,7 +1,7 @@
-import { IsUUID, IsNotEmpty } from 'class-validator';
+import { IsUUID, IsOptional } from 'class-validator';
 
 export class AcknowledgeIncidentDto {
   @IsUUID()
-  @IsNotEmpty()
-  userId: string;
+  @IsOptional()
+  userId?: string;
 }

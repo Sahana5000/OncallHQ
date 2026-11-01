@@ -6,6 +6,7 @@ import { IngestionController } from './ingestion.controller';
 import { IncidentsModule } from '../incidents/incidents.module';
 import { SchedulesModule } from '../schedules/schedules.module';
 import { AuditModule } from '../audit/audit.module';
+import { MaintenanceModule } from '../maintenance/maintenance.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { AuditModule } from '../audit/audit.module';
     IncidentsModule,
     SchedulesModule,
     AuditModule,
+    MaintenanceModule,
   ],
   controllers: [IngestionController],
   providers: [IngestionService],
